@@ -1,0 +1,269 @@
+################################################################################
+# jake.mf
+#
+# How to use:
+#
+# in the root of your build dir:
+#   mkdir include
+#   touch include/dependencies.mf
+#   git add include/dependencies.mf
+#   mkdir modules
+#   git submodule add path/to/jake modules/jake
+#   ln -s modules/jake/wrapper.mf .
+#   git commit
+#
+# in your root makefile:
+#
+#  1: subdirs := subdir1 subdir2
+#  2: include path/to/jake.mf
+
+################################################################################
+# Defaults. feel free to override.
+
+CC = g++
+CXXFLAGS_BASE = -g -std=c++11 -Wall -Werror -pedantic -DCPPGM_COMPLIANCE -Iinclude -ftemplate-backtrace-limit=0
+CXXFLAGS = $(CXXFLAGS_BASE) -O2
+CXXFLAGS_NOOPT = $(CXXFLAGS_BASE)
+
+################################################################################
+
+all:
+
+JE4D_ROOT := 1
+.SUFFIXES:
+
+define include_subdir
+SUBDIRS += $(DIR)$(if $(DIR),/,)$(1)
+include $(DIR)$(if $(DIR),/,)$(1)/Makefile
+endef
+
+SPACE :=
+SPACE +=
+
+reverse = $(if $(1),$(call reverse,$(wordlist 2,$(words $(1)),$(1)))) $(firstword $(1))
+
+invert_path = $(subst $(SPACE),/,$(patsubst %,..,$(subst /, ,$(1))))
+
+define subdir_start
+includes :=
+apps :=
+utilities :=
+units :=
+generated_units :=
+custom_generated_units :=
+subdirs :=
+$(eval $(1)/all:)
+endef
+
+define subdir_end
+binaries = $(apps) $(utilities)
+$$(eval $$(call subdir_end_1,$(1)))
+$$(foreach subdir,$$(subdirs),$$(eval $$(call include_subdir,$$(subdir))))
+endef
+
+define subdir_end_1
+$(1)_apps = $(apps:%=$(1)/%)
+$(1)_utilities = $(utilities:%=$(1)/%)
+$(1)_binaries = $(binaries:%=$(1)/%)
+$(1)_units = $(units:%=$(1)/%)
+$(1)_generated_units = $(generated_units:%=$(1)/%)
+$(1)_custom_generated_units = $(custom_generated_units:%=$(1)/%)
+$$(eval $$(call subdir_end_2,$(1)))
+$(eval $(1)/commit-test: \
+		$(if $(commit_test_targets),$(commit_test_targets),$(1)/test))
+endef
+
+define subdir_end_2
+$(1)_apps_tgt = $($(1)_apps:%=build/%)
+$(1)_utilities_tgt = $($(1)_utilities:%=build/%)
+$(1)_binaries_tgt = $($(1)_binaries:%=build/%)
+$(1)_units_tgt = $($(1)_units:%=build/%.o)
+$(1)_generated_units_tgt = $($(1)_generated_units:%=build/%.o)
+$(1)_custom_generated_units_tgt = $($(1)_custom_generated_units:%=build/%.o)
+$$(eval $$(call subdir_end_3,$(1)))
+endef
+
+define subdir_end_3
+$(1)_app_units_tgt = $($(1)_apps_tgt:%=%.o)
+$(1)_utility_units_tgt = $($(1)_utilities_tgt:%=%.o)
+$(1)_binary_units_tgt = $($(1)_binaries_tgt:%=%.o)
+$(1)_CXXFLAGS = $(foreach inc,$(includes),-I$(inc))
+$$(eval $$(call subdir_end_4,$(1)))
+endef
+
+define subdir_end_4
+apps_tgt := $($(1)_apps_tgt)
+utilities_tgt := $($(1)_utilities_tgt)
+binaries_tgt := $($(1)_binaries_tgt)
+units_tgt := $($(1)_units_tgt)
+app_units_tgt := $($(1)_app_units_tgt)
+utility_units_tgt := $($(1)_utility_units_tgt)
+binary_units_tgt := $($(1)_binary_units_tgt)
+generated_units_tgt := $($(1)_generated_units_tgt)
+custom_generated_units_tgt := $($(1)_custom_generated_units_tgt)
+UNITS += $($(1)_units)
+GENERATED_UNITS += $($(1)_generated_units)
+CUSTOM_GENERATED_UNITS += $($(1)_custom_generated_units)
+BINARIES += $($(1)_binaries)
+$(foreach bin,$(binaries),
+		$(eval build/$(1)/$(bin)_objects_norel := $($(bin)_objects_norel:%=build/%.o))
+		$(eval build/$(1)/$(bin): $(build/$(1)/$(bin)_objects_norel))
+		$(eval build/$(1)/$(bin)_objects := $($(bin)_objects:%=build/$(1)/%.o))
+		$(eval build/$(1)/$(bin): $(build/$(1)/$(bin)_objects))
+	)
+$(foreach unit,$(units) $(binaries),
+		$(eval $(1)/$(unit)_SOURCE := $(if $($(unit)_source), \
+				$($(unit)_source), \
+				$(1)/$(unit) \
+			)
+		)
+		$(eval build/$(1)/$(unit).d: $($(1)/$(unit)_SOURCE:%=%.cpp))
+		$(eval build/$(1)/$(unit).o: $($(1)/$(unit)_SOURCE:%=%.cpp))
+	)
+$(foreach unit,$(generated_units) $(custom_generated_units),
+		$(eval build/$(1)/$(unit)_SOURCE := $(if $($(unit)_source), \
+				build/$(1)/$($(unit)_source), \
+				build/$(1)/$(unit) \
+			)
+		)
+		$(eval build/$(1)/$(unit).d: $(build/$(1)/$(unit)_SOURCE:%=%.cpp))
+		$(eval build/$(1)/$(unit).o: $(build/$(1)/$(unit)_SOURCE:%=%.cpp))
+	)
+$(foreach unit,$(units) $(binaries) $(generated_units) $(custom_generated_units),
+		$(eval build/$(1)/$(unit).o_CXXFLAGS := $($(unit)_CXXFLAGS))
+	)
+$$(eval $$(call subdir_end_5,$(1)))
+endef
+
+define subdir_end_5
+all_tgts = \
+	$(binaries_tgt) \
+	$(binary_units_tgt) \
+	$(units_tgt) \
+	$(generated_units_tgt) \
+	$(custom_generated_units_tgt)
+$$(eval $$(call subdir_end_6,$(1)))
+endef
+
+define subdir_end_6
+$(foreach tgt,$(all_tgts), $(eval $(tgt)_CXXFLAGS += $($(1)_CXXFLAGS)))
+endef
+
+define target_add
+$(1)$(if $(1),/,)$(2): $($(1)$(if $(1),_,)$(3):%=build/%)
+endef
+
+define source_file
+$(shell echo source_file called for $(1), result $(if $($(1)_SOURCE),$($($(1)_SOURCE)).cpp,$(1).cpp) >&2)
+$(if $($(1)_SOURCE),$($($(1)_SOURCE)).cpp,$(1).cpp)
+endef
+
+SUBDIRS :=
+UNITS :=
+GENERATED_UNITS :=
+CUSTOM_GENERATED_UNITS :=
+BINARIES :=
+
+$(foreach subdir,$(subdirs),$(eval $(call include_subdir,$(subdir))))
+
+UNITS += $(BINARIES)
+
+$(UNITS:%=build/%.d) : build/%.d: $(makefile_dep)
+	@mkdir -p $(dir $@)
+	$(CC) -M -MG -MP -MT ${subst .d,.o,$@} -MF $@ $(CXXFLAGS) $($@_CXXFLAGS) $($*_SOURCE:%=%.cpp)
+
+$(UNITS:%=build/%.o): build/%.o: $(makefile_dep) | build/%.d
+	@mkdir -p $(dir $@)
+	$(CC) -MD -MP -MT $@ -c -o $@ $(CXXFLAGS) $($@_CXXFLAGS) $($*_SOURCE:%=%.cpp)
+
+$(GENERATED_UNITS:%=build/%.cpp): build/%.cpp: build/%_gen $(makefile_dep)
+	mkdir -p build
+	$< > $@ || rm -f $@
+
+$(GENERATED_UNITS:%=build/%.d) \
+$(CUSTOM_GENERATED_UNITS:%=build/%.d) \
+		: build/%.d: $(makefile_dep)
+	@mkdir -p build
+	$(CC) -M -MG -MP -MT ${subst .d,.o,$@} -MF $@ $(CXXFLAGS) $($@_CXXFLAGS) $(build/$*_SOURCE:%=%.cpp)
+
+$(GENERATED_UNITS:%=build/%.o) \
+$(CUSTOM_GENERATED_UNITS:%=build/%.o) \
+		: build/%.o: $(makefile_dep) | build/%.d
+	@mkdir -p build
+	$(CC) -MD -MP -MT $@ -c -o $@ $(CXXFLAGS) $($@_CXXFLAGS) $(build/$*_SOURCE:%=%.cpp)
+
+$(BINARIES:%=build/%): build/%: build/%.o
+	$(CC) -o $@ $(CXXFLAGS) $($@_CXXFLAGS) $< $($@_objects) $($@_objects_norel)
+
+$(APPS): %: build/%
+	ln -sf $^ $@
+
+-include $(UNITS:%=build/%.d)
+-include include/dependencies.mf
+
+################################################################################
+
+everything: all $(SUBDIRS:%=%/everything)
+clean:
+	-rm -rf build/
+%/clean:
+	-rm -rf build/$*
+$(SUBDIRS:%=%/test):
+test: $(SUBDIRS:%=%/test)
+$(SUBDIRS:%=%/commit-test):
+commit-test: $(SUBDIRS:%=%/commit-test)
+$(SUBDIRS:%=%/all): %/all: %/build
+$(SUBDIRS:%=%/build): %/build:
+	ln -sf $(call invert_path,$*)/build/$* $*/build
+
+COMMIT_PRECHECK := git status -s | grep -q '^[^ ?!].'
+
+commit-precheck:
+	@+if ! $(COMMIT_PRECHECK); then \
+		echo '\n *** Nothing staged for commit, aborting. *** \n' >&2; \
+		git status; \
+		false; \
+	else \
+		true; \
+	fi
+
+COMMIT_CHECK_FAIL := git status -s | grep -q '^.[^ ]'
+
+commit-check:
+	@if $(COMMIT_CHECK_FAIL); then \
+		echo '\n *** Workspace modified during commit, aborting. *** \n' >&2; \
+		git status; \
+		echo '\n *** Workspace modified during commit, aborting. *** \n' >&2; \
+		false; \
+	else \
+		true; \
+	fi
+
+commit: commit-precheck
+	@./generate_includes.sh
+	@+if $(COMMIT_CHECK_FAIL); then \
+		echo '\n *** Stashing unstaged changes *** \n' >&2; \
+		git stash save --keep-index --include-untracked \
+			"temporary stash for make commit, `date`"; \
+		git status; \
+		$(MAKE) commit-run-tests; \
+		RC=$$?; \
+		git stash pop; \
+		[ $$RC = "0" ] && \
+			git log --graph --decorate --all --author-date-order --oneline \
+				--color | head; \
+		$$(exit $$RC); \
+	else \
+		$(MAKE) commit-run-tests; \
+	fi
+
+commit-run-tests: commit-test
+	@+$(MAKE) commit-perform
+
+commit-perform: commit-check
+	@git commit
+
+$(SUBDIRS:%=%/commit): %: commit
+
+################################################################################
+# vim: set syntax=make:

@@ -1,0 +1,19 @@
+# vim: set syntax=make:
+
+.SUFFIXES:
+
+SPACE :=
+SPACE +=
+invert_path = $(subst $(SPACE),/,$(patsubst %,..,$(subst /, ,$(1))))
+
+invert_DIR = $(call invert_path,$(DIR))
+
+all:
+Makefile:
+commit:
+	$(MAKE) -C $(invert_DIR) commit
+%:
+	@+([ "$@" != "$(@:build/%=%)" ] && \
+		stdbuf -i0 -o0 -e0 $(MAKE) -j1 -C $(invert_DIR) build/$(DIR)/$(@:build/%=%) || \
+		stdbuf -i0 -o0 -e0 $(MAKE) -j1 -C $(invert_DIR) $(DIR)/$@) \
+		| sed -u 's,[a-zA-Z0-9./_]*\.[ch]pp,$(invert_DIR)/&,'
