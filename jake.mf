@@ -240,7 +240,6 @@ commit-check:
 	fi
 
 commit: commit-precheck
-	@./generate_includes.sh
 	@+if $(COMMIT_CHECK_FAIL); then \
 		echo '\n *** Stashing unstaged changes *** \n' >&2; \
 		git stash save --keep-index --include-untracked \
