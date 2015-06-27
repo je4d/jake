@@ -193,7 +193,7 @@ $(CUSTOM_GENERATED_UNITS:%=build/%.o) \
 	$(CC) -MD -MP -MT $@ -c -o $@ $(CXXFLAGS) $($@_CXXFLAGS) $(build/$*_SOURCE:%=%.cpp)
 
 $(BINARIES:%=build/%): build/%: build/%.o
-	$(CC) -o $@ $(CXXFLAGS) $($@_CXXFLAGS) $< $($@_objects) $($@_objects_norel)
+	$(CC) -o $@ $(CXXFLAGS) $($@_CXXFLAGS) $(LDFLAGS) $($@_LDFLAGS) $< $($@_objects) $($@_objects_norel)
 
 $(APPS): %: build/%
 	ln -sf $^ $@
