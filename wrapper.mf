@@ -14,6 +14,6 @@ commit:
 	$(MAKE) -C $(invert_DIR) commit
 %:
 	@+(([ "$@" != "$(@:build/%=%)" ] && \
-		stdbuf -i0 -o0 -e0 $(MAKE) -j1 -C $(invert_DIR) build/$(DIR)/$(@:build/%=%) || \
-		stdbuf -i0 -o0 -e0 $(MAKE) -j1 -C $(invert_DIR) $(DIR)/$@) \
+		stdbuf -i0 -o0 -e0 $(MAKE) -C $(invert_DIR) build/$(DIR)/$(@:build/%=%) || \
+		stdbuf -i0 -o0 -e0 $(MAKE) -C $(invert_DIR) $(DIR)/$@) \
 		2>&1 >&3 |sed -u 's,[a-zA-Z0-9./_]*\.[ch]pp,$(invert_DIR)/&,') 3>&1
