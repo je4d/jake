@@ -199,6 +199,8 @@ $(APPS): %: build/%
 	ln -sf $^ $@
 
 -include $(UNITS:%=build/%.d)
+-include $(GENERATED_UNITS:%=build/%.d)
+-include $(CUSTOM_GENERATED_UNITS:%=build/%.d)
 -include include/dependencies.mf
 
 ################################################################################
