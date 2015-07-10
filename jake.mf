@@ -21,7 +21,8 @@
 # Defaults. feel free to override.
 
 CC = g++
-CXXFLAGS_BASE = -g -std=c++11 -Wall -Werror -pedantic -DCPPGM_COMPLIANCE -Iinclude -ftemplate-backtrace-limit=0
+GCC_COLOR ?= auto
+CXXFLAGS_BASE = -g -std=c++11 -Wall -Werror -pedantic -Iinclude -ftemplate-backtrace-limit=0 -fdiagnostics-color=$(GCC_COLOR)
 CXXFLAGS = $(CXXFLAGS_BASE) -O2
 CXXFLAGS_NOOPT = $(CXXFLAGS_BASE)
 
